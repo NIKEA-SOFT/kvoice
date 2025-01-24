@@ -2,6 +2,7 @@
 
 #include "voice_exception.hpp"
 #include <opus.h>
+#include <algorithm>
 
 kvoice::stream_impl::stream_impl(sound_output_impl* output, std::string_view url, std::uint32_t file_offset, std::int32_t sample_rate)
     : sample_rate(sample_rate),
