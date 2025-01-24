@@ -1,11 +1,11 @@
 #include "bass/bass.h"
 #include "voice_exception.hpp"
 #include "sound_output_impl.hpp"
-
 #include "stream_impl.hpp"
+#include <array>
 
 kvoice::sound_output_impl::sound_output_impl(std::string_view device_name, std::uint32_t sample_rate)
-    : sampling_rate(sample_rate), requests_queue(16) {
+    : sampling_rate(sample_rate), requests() {
     using namespace std::string_literals;
 
     std::mutex              condvar_mtx{};
@@ -70,7 +70,13 @@ kvoice::sound_output_impl::sound_output_impl(std::string_view device_name, std::
                 BASS_SetDevice(-1);
                 device_need_update.store(false);
             }
-            requests_queue.consume_all([this](const request_stream_message& msg) {
+
+            std::array<request_stream_message, ringbuffer_max_size> msg_buffer;
+            std::size_t available = requests.readBuff(msg_buffer.data(), msg_buffer.size());
+
+            for (std::size_t i = 0; i < available; i++)
+            {
+                auto& msg = msg_buffer[i];
                 if (msg.params.has_value()) {
                     auto& params = *msg.params;
                     msg.on_creation_callback(std::make_unique<stream_impl>(this, params.url, params.file_offset, this->sampling_rate));
@@ -78,7 +84,7 @@ kvoice::sound_output_impl::sound_output_impl(std::string_view device_name, std::
                 else {
                     msg.on_creation_callback(std::make_unique<stream_impl>(this, this->sampling_rate));
                 }
-            });
+            };
 
             std::this_thread::sleep_for(std::chrono::milliseconds(16));
         }
@@ -126,10 +132,10 @@ void kvoice::sound_output_impl::change_device(std::string_view device_name) {
 }
 
 void kvoice::sound_output_impl::create_stream(on_create_callback cb) {
-    requests_queue.push(request_stream_message{std::nullopt, cb});
+    requests.insert(request_stream_message{ std::nullopt, cb });
 }
 
 void kvoice::sound_output_impl::create_stream(on_create_callback cb, 
     std::string_view url, std::uint32_t file_offset) {
-    requests_queue.push(request_stream_message{std::make_optional(online_stream_parameters{ std::string{ url }, file_offset }), std::move(cb)});
+    requests.insert(request_stream_message{std::make_optional(online_stream_parameters{ std::string{ url }, file_offset }), std::move(cb)});
 }

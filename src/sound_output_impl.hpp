@@ -1,16 +1,15 @@
 #pragma once
-#include <boost/lockfree/spsc_queue.hpp>
-#include <boost/thread/concurrent_queues/sync_queue.hpp>
 
 #include "bass/bass.h"
 #include <variant>
 #include <optional>
 #include "sound_output.hpp"
 #include "ktsignal/ktsignal.hpp"
+#include "ringbuffer.hpp"
 
 namespace kvoice {
 class sound_output_impl : public sound_output {
-
+    static constexpr std::size_t ringbuffer_max_size = 16;
     struct online_stream_parameters {
         std::string url;
         std::uint32_t file_offset;
@@ -87,7 +86,7 @@ public:
 
     ktsignal::ktsignal<void()> drop_source_signal;
 private:
-    boost::lockfree::spsc_queue<request_stream_message> requests_queue;
+    jnk0le::Ringbuffer<request_stream_message, ringbuffer_max_size> requests;
     std::atomic_bool                                   output_alive{ false };
     std::thread                                        output_thread{};
 

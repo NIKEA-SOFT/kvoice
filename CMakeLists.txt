@@ -5,9 +5,6 @@ project ("kvoice")
 option(BUILD_KVOICE_EXAMPLES "Build the examples" ON)
 option(KVOICE_BUILD_STATIC "Build static libs" ON)
 
-find_package(Opus CONFIG REQUIRED)
-find_package(Boost REQUIRED)
-
 add_subdirectory("third-party")
 
 set(INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
@@ -40,7 +37,7 @@ endif()
 
 target_link_libraries(rnnoise PRIVATE Opus::opus)
 
-target_link_libraries(kvoice PUBLIC Opus::opus basslib Boost::boost rnnoise)
+target_link_libraries(kvoice PUBLIC Opus::opus basslib rnnoise)
 
 if (${BUILD_KVOICE_EXAMPLES}) 
 	add_subdirectory("examples")
