@@ -1,3 +1,6 @@
 [submodule "third-party/rnnoise"]
 	path = third-party/rnnoise
 	url = https://github.com/kin4stat/rnnoise-cmake
+[submodule "third-party/opus"]
+	path = third-party/opus
+	url = https://github.com/xiph/opus.git
