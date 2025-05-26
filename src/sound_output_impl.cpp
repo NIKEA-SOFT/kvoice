@@ -3,6 +3,7 @@
 #include "sound_output_impl.hpp"
 #include "stream_impl.hpp"
 #include <array>
+#include <chrono>
 
 kvoice::sound_output_impl::sound_output_impl(std::string_view device_name, std::uint32_t sample_rate)
     : sampling_rate(sample_rate), requests() {
