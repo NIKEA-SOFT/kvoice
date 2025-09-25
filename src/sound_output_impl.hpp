@@ -36,6 +36,19 @@ public:
     sound_output_impl(std::string_view device_name, std::uint32_t sample_rate);
     ~sound_output_impl() override;
 
+
+    /**
+    * @brief Register channel
+    * @param h Channel handle
+    */
+    void register_channel(DWORD h);
+
+    /**
+    * @brief Unregister channel
+    * @param h Channel handle
+    */
+    void unregister_channel(DWORD h);
+
     /**
      * @brief Sets local position(changes should be applied manually)
      * @param pos Local position
@@ -87,8 +100,11 @@ public:
     ktsignal::ktsignal<void()> drop_source_signal;
 private:
     jnk0le::Ringbuffer<request_stream_message, ringbuffer_max_size> requests;
-    std::atomic_bool                                   output_alive{ false };
-    std::thread                                        output_thread{};
+    std::atomic_bool output_alive{ false };
+    std::thread output_thread{};
+
+    std::mutex channels_mtx_;
+    std::vector<DWORD> channels_;
 
     std::mutex spatial_mtx{};
 

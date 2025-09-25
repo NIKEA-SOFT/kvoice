@@ -8,6 +8,7 @@ kvoice::stream_impl::stream_impl(sound_output_impl* output, std::string_view url
     : sample_rate(sample_rate),
       output_impl(output) {
     stream_handle = BASS_StreamCreateURL(url.data(), 0, BASS_SAMPLE_MONO | BASS_SAMPLE_3D, nullptr, nullptr);
+    output_impl->register_channel(stream_handle);
 
     auto err = BASS_ErrorGetCode();
 
@@ -23,7 +24,7 @@ kvoice::stream_impl::stream_impl(sound_output_impl* output, std::string_view url
 
     decoder = nullptr;
 
-    file_offset = BASS_ChannelSeconds2Bytes(stream_handle, file_offset);
+    file_offset = (uint32_t)BASS_ChannelSeconds2Bytes(stream_handle, (double)file_offset);
     BASS_ChannelPlay(stream_handle, false);
     BASS_ChannelSetPosition(stream_handle, file_offset, BASS_POS_BYTE | BASS_POS_DECODETO);
     BASS_ChannelSetPosition(stream_handle, file_offset, BASS_POS_BYTE);
@@ -33,6 +34,7 @@ kvoice::stream_impl::stream_impl(sound_output_impl* output, std::int32_t sample_
     : sample_rate(sample_rate),
       output_impl(output) {
     stream_handle = BASS_StreamCreate(sample_rate, 1, BASS_SAMPLE_FLOAT | BASS_SAMPLE_3D, &bass_cb, this);
+    output_impl->register_channel(stream_handle);
     type = stream_type::kLocalDataStream;
     int opus_err;
     decoder = opus_decoder_create(sample_rate, 1, &opus_err);
@@ -46,7 +48,11 @@ kvoice::stream_impl::stream_impl(sound_output_impl* output, std::int32_t sample_
 }
 
 kvoice::stream_impl::~stream_impl() {
-    BASS_StreamFree(stream_handle);
+    if (stream_handle) {
+        output_impl->unregister_channel(stream_handle);
+        BASS_StreamFree(stream_handle);
+        stream_handle = 0;
+    }
 }
 
 bool kvoice::stream_impl::push_buffer(const void* data, std::size_t count) {
@@ -117,7 +123,7 @@ void kvoice::stream_impl::set_gain(float gain) {
 }
 
 void  kvoice::stream_impl::set_granularity(std::uint32_t granularity) {
-    BASS_ChannelSetAttribute(stream_handle, BASS_ATTRIB_GRANULE, granularity);
+    BASS_ChannelSetAttribute(stream_handle, BASS_ATTRIB_GRANULE, (float)granularity);
 }
 
 bool kvoice::stream_impl::is_playing() {
