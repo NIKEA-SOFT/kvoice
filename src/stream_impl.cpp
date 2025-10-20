@@ -122,6 +122,10 @@ void kvoice::stream_impl::set_gain(float gain) {
     BASS_ChannelSetAttribute(stream_handle, BASS_ATTRIB_VOL, gain);
 }
 
+float kvoice::stream_impl::get_gain() const {
+    return output_gain;
+}
+
 void  kvoice::stream_impl::set_granularity(std::uint32_t granularity) {
     BASS_ChannelSetAttribute(stream_handle, BASS_ATTRIB_GRANULE, (float)granularity);
 }

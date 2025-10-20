@@ -156,7 +156,10 @@ void kvoice::sound_output_impl::set_my_orientation_front(vector front) noexcept 
 }
 
 void kvoice::sound_output_impl::set_gain(float gain) noexcept {
-    output_gain.store(gain);
+    output_gain.store(gain); }
+
+float kvoice::sound_output_impl::get_gain() const { 
+    return output_gain.load(std::memory_order_acquire);
 }
 
 void kvoice::sound_output_impl::change_device(std::string_view device_name) {

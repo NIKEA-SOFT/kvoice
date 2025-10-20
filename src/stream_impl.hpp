@@ -41,6 +41,8 @@ public:
     void set_spatial_state(bool spatial_state) override;
     void set_gain(float gain) override;
 
+    float get_gain() const override;
+
     bool is_playing() override;
 
     void update() override;

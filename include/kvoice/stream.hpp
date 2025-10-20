@@ -72,6 +72,11 @@ public:
      * @param gain new output gain
      */
     virtual void set_gain(float gain) = 0;
+    /**
+     * @brief get output gain
+     * @return output gain volume (normalized)
+     */
+    virtual float get_gain() const = 0;
 
     /**
      * @brief is playing sound now

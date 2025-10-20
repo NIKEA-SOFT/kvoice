@@ -86,6 +86,12 @@ public:
     void set_gain(float gain) noexcept override;
 
     /**
+    * @brief Get output gain
+    * @return Output gain (normalized)
+    */
+    float get_gain() const override;
+
+    /**
      * @brief changes output device
      * @param device_name name of new output device
      */
@@ -93,7 +99,6 @@ public:
 
     void                        set_buffering_time(std::uint32_t time_ms) override { buffering_time = time_ms; }
     [[nodiscard]] std::uint32_t get_buffering_time() const { return buffering_time; }
-    [[nodiscard]] float         get_gain() const { return output_gain.load(); }
     void     create_stream(on_create_callback cb) override;
     void     create_stream(on_create_callback cb, std::string_view url, std::uint32_t file_offset) override;
 

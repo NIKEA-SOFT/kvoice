@@ -50,6 +50,12 @@ public:
     virtual void set_gain(float gain) = 0;
 
     /**
+     * @brief Get output gain
+     * @return Output gain (normalized)
+     */
+    virtual float get_gain() const = 0;
+
+    /**
      * @brief changes output device
      * @param device_name name of new output device
      * @throws voice_exception if device couldn't be open
