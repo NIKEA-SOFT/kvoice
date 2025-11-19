@@ -29,10 +29,17 @@ kvoice::sound_output_impl::sound_output_impl(std::string_view device_name, std::
             // idx == -1 -> default device
             BASS_DEVICEINFO di{};
             if (idx != -1) BASS_GetDeviceInfo(idx, &di);
-            if (idx == -1 || !(di.flags & BASS_DEVICE_INIT)) {
-                if (!BASS_Init(idx, sample_rate, BASS_DEVICE_MONO | BASS_DEVICE_3D, nullptr, nullptr)) {
+            if (idx == -1 || !(di.flags & BASS_DEVICE_INIT))
+            {
+                DWORD flags = 0;
+                flags |= BASS_DEVICE_STEREO;
+                flags |= BASS_DEVICE_FREQ;
+
+                if (!BASS_Init(idx, sample_rate, flags, nullptr, nullptr)) {
                     return -1;
                 }
+
+                BASS_SetConfig(BASS_CONFIG_3DALGORITHM, BASS_3DALG_DEFAULT);
             }
 
             BASS_SetDevice(idx);
