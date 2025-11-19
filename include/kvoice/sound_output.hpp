@@ -14,6 +14,26 @@ public:
     virtual ~sound_output() = default;
 
     /**
+     * @brief Enable crossfeed for output sound
+     * @param enabled True/false for enable and disable crossfeed
+     * @return void
+     */
+    virtual void set_crossfeed_enabled(bool enabled) noexcept = 0;
+
+    /**
+     * @brief Set crossfeed coefficient
+     * @param cf Coefficient for L/R balance
+     * @return void
+     */
+    virtual void set_crossfeed_coefficient(float cf) noexcept = 0;
+
+    /**
+     * @brief Check is enabled crossfeed
+     * @return bool result true/false
+     */
+    [[nodiscard]] virtual bool is_crossfeed_enabled() const noexcept = 0;
+
+    /**
      * @brief Sets local position(changes should be applied manually)
      * @param pos Local position
      * @ref update_me

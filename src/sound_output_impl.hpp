@@ -50,6 +50,26 @@ public:
     void unregister_channel(DWORD h);
 
     /**
+    * @brief Enable crossfeed for output sound
+    * @param enabled True/false for enable and disable crossfeed
+    * @return void
+    */
+    void set_crossfeed_enabled(bool enabled) noexcept override;
+
+    /**
+     * @brief Set crossfeed coefficient
+     * @param cf Coefficient for L/R balance
+     * @return void
+     */
+    void set_crossfeed_coefficient(float cf) noexcept override;
+
+    /**
+    * @brief Check is enabled crossfeed
+    * @return bool result true/false
+    */
+    [[nodiscard]] bool is_crossfeed_enabled() const noexcept override;
+
+    /**
      * @brief Sets local position(changes should be applied manually)
      * @param pos Local position
      * @ref update_me
@@ -125,5 +145,15 @@ private:
 
     std::uint32_t sampling_rate{ 0 };
     std::uint32_t buffering_time{ 0 };
+
+    // Device mix stream и DSP для crossfeed
+    HSTREAM device_mix_stream_ = 0;
+    HDSP    crossfeed_dsp_handle_ = 0;
+
+    std::atomic_bool crossfeed_desired_{ false };
+    std::atomic<float> crossfeed_coeff_{0.20f};
+
+    // DSP на финальном миксе
+    static void CALLBACK crossfeed_dsp(HDSP handle, DWORD channel, void* buffer, DWORD length, void* user);
 };
 } // namespace kvoice

@@ -3,6 +3,7 @@
 #include "sound_output_impl.hpp"
 #include "stream_impl.hpp"
 #include <array>
+#include <algorithm>
 #include <chrono>
 
 kvoice::sound_output_impl::sound_output_impl(std::string_view device_name, std::uint32_t sample_rate)
@@ -40,10 +41,42 @@ kvoice::sound_output_impl::sound_output_impl(std::string_view device_name, std::
                 }
 
                 BASS_SetConfig(BASS_CONFIG_3DALGORITHM, BASS_3DALG_DEFAULT);
+                BASS_SetConfig(BASS_CONFIG_FLOATDSP, TRUE);
             }
 
             BASS_SetDevice(idx);
             return idx;
+        };
+
+        auto setupDeviceMix = [this]() {
+            BASS_INFO info{};
+            if (!BASS_GetInfo(&info)) return;
+
+            if (info.speakers != 0 && info.speakers != 2) return;
+
+            if (device_mix_stream_) {
+                BASS_StreamFree(device_mix_stream_);
+                device_mix_stream_ = 0;
+                crossfeed_dsp_handle_ = 0;
+            }
+
+            device_mix_stream_ = BASS_StreamCreate(0, 0, 0, STREAMPROC_DEVICE_3D, nullptr);
+            if (!device_mix_stream_) {
+                device_mix_stream_ = BASS_StreamCreate(0, 0, 0, STREAMPROC_DEVICE, nullptr);
+            }
+
+            if (device_mix_stream_) {
+                crossfeed_dsp_handle_ =
+                    BASS_ChannelSetDSP(device_mix_stream_, &sound_output_impl::crossfeed_dsp, this, 0);
+            }
+        };
+
+        auto teardownDeviceMix = [this]() {
+            if (device_mix_stream_) {
+                BASS_StreamFree(device_mix_stream_);
+                device_mix_stream_ = 0;
+                crossfeed_dsp_handle_ = 0;
+            }
         };
 
         (void)ensureDeviceInited(name);
@@ -58,34 +91,54 @@ kvoice::sound_output_impl::sound_output_impl(std::string_view device_name, std::
         {
             BASS_SetConfig(BASS_CONFIG_GVOL_STREAM, static_cast<unsigned>(output_gain.load() * 10000));
 
-            if (device_need_update.load()) {
+            if (device_need_update.load())
+            {
                 int target = ensureDeviceInited(this->device_name);
                 if (target == -1) {
                     target = ensureDeviceInited("");
                 }
 
-                if (target != -1) {
+                if (target != -1)
+                {
                     {
                         std::lock_guard lk(channels_mtx_);
                         for (DWORD h : channels_)
                         {
                             if (!h) continue;
+
                             BASS_CHANNELINFO ci{};
-                            if (BASS_ChannelGetInfo(h, &ci) && (ci.flags & BASS_STREAM_DECODE))
+                            if (BASS_ChannelGetInfo(h, &ci) && (ci.flags & BASS_STREAM_DECODE)) {
                                 continue;
+                            }
 
                             BASS_ChannelPause(h);
-                            if (!BASS_ChannelSetDevice(h, target)) {
-
-                            }
+                            BASS_ChannelSetDevice(h, target);
                             BASS_ChannelPlay(h, FALSE);
                         }
                     }
 
                     BASS_SetDevice(target);
+
+                    if (crossfeed_desired_.load()) {
+                        teardownDeviceMix();
+                        setupDeviceMix();
+                    }
                 }
 
                 device_need_update.store(false);
+            }
+
+            static bool crossfeed_enabled = false;
+            bool desired = crossfeed_desired_.load();
+            if (desired != crossfeed_enabled)
+            {
+                if (desired) {
+                    setupDeviceMix();
+                } else {
+                    teardownDeviceMix();
+                }
+
+                crossfeed_enabled = desired;
             }
 
             {
@@ -116,6 +169,7 @@ kvoice::sound_output_impl::sound_output_impl(std::string_view device_name, std::
             std::this_thread::sleep_for(std::chrono::milliseconds(16));
         }
 
+        teardownDeviceMix();
         BASS_Free();
     });
 
@@ -140,6 +194,18 @@ void kvoice::sound_output_impl::unregister_channel(DWORD h)
     std::lock_guard lk(channels_mtx_);
     auto it = std::find(channels_.begin(), channels_.end(), h);
     if (it != channels_.end()) channels_.erase(it);
+}
+
+void kvoice::sound_output_impl::set_crossfeed_enabled(bool enabled) noexcept {
+    crossfeed_desired_.store(enabled, std::memory_order_release);
+}
+
+void kvoice::sound_output_impl::set_crossfeed_coefficient(float cf) noexcept {
+    crossfeed_coeff_.store(std::clamp<float>(cf, 0.f, 1.f));
+}
+
+bool kvoice::sound_output_impl::is_crossfeed_enabled() const noexcept {
+    return crossfeed_desired_.load(std::memory_order_acquire);
 }
 
 void kvoice::sound_output_impl::set_my_position(vector pos) noexcept {
@@ -182,4 +248,27 @@ void kvoice::sound_output_impl::create_stream(on_create_callback cb) {
 void kvoice::sound_output_impl::create_stream(on_create_callback cb, 
     std::string_view url, std::uint32_t file_offset) {
     requests.insert(request_stream_message{std::make_optional(online_stream_parameters{ std::string{ url }, file_offset }), std::move(cb)});
+}
+
+void CALLBACK kvoice::sound_output_impl::crossfeed_dsp(HDSP handle, DWORD channel, void* buffer, DWORD length, void* user) {
+    (void)handle;
+    (void)channel;
+
+    const auto* self = static_cast<sound_output_impl*>(user);
+    float* samples = static_cast<float*>(buffer);
+    DWORD  frames = length / (sizeof(float) * 2);
+
+    const float cf = self->crossfeed_coeff_.load(std::memory_order_acquire);
+    const float norm = 1.0f / (1.0f + cf);
+
+    for (DWORD i = 0; i < frames; ++i) {
+        float L = samples[i * 2 + 0];
+        float R = samples[i * 2 + 1];
+
+        float L2 = (L + cf * R) * norm;
+        float R2 = (R + cf * L) * norm;
+
+        samples[i * 2 + 0] = L2;
+        samples[i * 2 + 1] = R2;
+    }
 }
